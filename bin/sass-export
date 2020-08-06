@@ -7,11 +7,12 @@ var minimist = require('minimist');
 
 var options = minimist(process.argv.slice(2), {
   alias: {
-    o: 'output',
+    o: 'outputDir',
     a: 'array',
-    d: 'dependencies',
+    p: 'paths',
     h: 'help',
-    v: 'version'
+    v: 'version',
+    d: 'detailed'
   }
 });
 
@@ -31,27 +32,40 @@ if (!inputFiles.length || options.help) {
   return;
 }
 
-if (!options.output) {
-  options.output = inputFiles[0] + '-exported.json';
+if (!options.outputDir) {
+  options.outputDir = './tokens/';
+}
+else if(options.outputDir[options.outputDir.length-1] !== '/') {
+  options.outputDir += '/';
 }
 
-var includePaths = (options.dependencies || '').split(',');
+if(!fs.existsSync(options.outputDir)) {
+  fs.mkdirSync(options.outputDir);
+}
 
-var exporter = sassExport({
-  inputFiles,
-  includePaths
+var includePaths = (options.paths || '').split(',');
+var detailed = options.detailed;
+
+inputFiles.forEach(f => {
+  var exporter = sassExport({
+    inputFiles: [f],
+    includePaths,
+    detailed
+  });
+  
+  var outputJson = options.array ? exporter.getArray() : exporter.getStructured();
+  
+  outputJson = JSON.stringify(outputJson, null, 2);
+
+  var idx = f.lastIndexOf('/');
+  if(idx !== -1) {
+    f = f.substr(idx+1, f.length);
+  }
+  
+  var fileName = options.outputDir + f.replace(/\.\w+/g, '') + '.json';
+
+  fs.writeFileSync(fileName, outputJson);
+  
+  console.log(`${fileName} was generated, go check it out!`);
 });
 
-var outputJson = [];
-
-if (options.array) {
-  outputJson = exporter.getArray();
-} else {
-  outputJson = exporter.getStructured();
-}
-
-outputJson = JSON.stringify(outputJson, null, 2);
-
-fs.writeFileSync(options.output, outputJson);
-
-console.log(`${options.output} was generated, go check it out!`);
